@@ -377,27 +377,38 @@ def server(input, output, session):
             if df.empty:
                 return ui.div("데이터 없음", class_="text-muted")
 
-            # 최신 데이터로 이상/불량 상태 확인
-            latest = df.iloc[-1] if len(df) > 0 else None
-            
-            # 이상 탐지 카드
-            anomaly_status = "이상" if hasattr(latest, 'is_anomaly') and latest.get('is_anomaly', 0) == 1 else "정상"
-            anomaly_score = latest.get('anomaly_score', 0) if latest is not None else 0
-            anomaly_icon = "❌" if anomaly_status == "이상" else "✅"
-            anomaly_class = "anomaly-card alert alert-danger" if anomaly_status == "이상" else "normal-card alert alert-success"
+            # 최신 실시간 데이터 가져오기
+            latest = df.iloc[-1]
+
+            # 이상 여부 판단 (-1: 이상 / 1: 정상)
+            try:
+                anomaly_val_raw = latest.get('is_anomaly', 1)
+                anomaly_val = int(float(anomaly_val_raw))
+            except:
+                anomaly_val = 1  # 파싱 실패 시 정상
+
+            anomaly_status = "이상" if anomaly_val == -1 else "정상"
+            anomaly_icon = "❌" if anomaly_val == -1 else "✅"
+            color_class = "alert alert-danger" if anomaly_val == -1 else "alert alert-success"
+            anomaly_score = latest.get('anomaly_level', 0)
+            # 시각 정리
             reg_time = latest.get('registration_time')
+            try:
+                reg_time = pd.to_datetime(reg_time).strftime("%Y-%m-%d %H:%M:%S")
+            except:
+                reg_time = str(reg_time)
+            
             return ui.div(
-                # 이상 탐지 카드
                 ui.div(
                     ui.h6(f"{anomaly_icon} 이상 탐지"),
                     ui.p(f"상태: {anomaly_status}"),
-                    ui.p(f"점수: {anomaly_score:.3f}"),
+                    ui.p(f"상태: {anomaly_score}"),
                     ui.p(f"시각: {reg_time}"),
                     ui.input_action_button("goto_2page", "이상탐지 확인하기", class_="btn btn-sm btn-outline-primary"),
-                    class_=anomaly_class
+                    class_=f"{color_class} p-3 rounded"
                 )
             )
-            
+
         except Exception as e:
             return ui.div(f"오류: {str(e)}", class_="text-danger")
         

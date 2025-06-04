@@ -56,7 +56,9 @@ selected_cols = [
     'high_section_speed',    # 고속 구간 속도
     'low_section_speed',     # 저속 구간 속도
     'biscuit_thickness',      # 비스킷 두께
-    'passorfail'
+    'passorfail',
+    'is_anomaly',
+    'anomaly_level'
 ]
 df_selected = streaming_df[selected_cols].reset_index(drop=True)
 
