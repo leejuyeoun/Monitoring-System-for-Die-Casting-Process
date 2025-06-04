@@ -1,0 +1,174 @@
+/* ===============================
+ 🏢 1. 기본 설정 (Base Styles)
+=============================== */
+:root {
+  --color-bg: #F2F4F6;              /* 전체 배경 - 밝은 회색 */
+  --color-card: #FFFFFF;            /* 카드 배경 - 흰색 */
+  --color-border: #D1D9E6;          /* 카드 테두리 - 흐린 회색 */
+  --color-text: #222B45;            /* 기본 텍스트 - 진회색 */
+  --color-subtext: #6E7687;         /* 서브 텍스트 - 연회색 */
+  --color-primary: #003D7C;         /* LS 블루 - 핵심 강조 */
+  --color-accent: #ED1C24;          /* LS 레드 - 경고, 포인트 */
+  --color-danger: #B71C1C;          /* 위험 알림 - 진한 빨강 */
+  --color-success: #2E7D32;         /* 성공 알림 - 진한 초록 */
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Noto Sans KR', 'Spoqa Han Sans Neo', 'Segoe UI', sans-serif;
+  font-size: 15px;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===============================
+ 📦 2. 카드 구성 요소
+=============================== */
+.card {
+  background-color: var(--color-card);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border: 2px solid var(--color-border);
+  transition: 0.3s;
+}
+.card:hover {
+  border-color: var(--color-primary);
+}
+.card-title {
+  font-size: 16px;
+  color: var(--color-subtext);
+  margin-bottom: 8px;
+}
+.card-value {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* ===============================
+ 📊 3. 테이블 스타일
+=============================== */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--color-card);
+  font-size: 14px;
+}
+.table th {
+  color: var(--color-primary);
+  border-bottom: 2px solid var(--color-border);
+  padding: 12px 10px;
+  text-align: left;
+  background-color: #e6ecf4;
+}
+.table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 10px;
+  color: var(--color-text);
+}
+
+/* ===============================
+ 🚨 4. 알림/상태 카드
+=============================== */
+.alert {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+.alert-warning {
+  background-color: #FFF3CD;
+  color: #856404;
+}
+.alert-danger {
+  background-color: var(--color-accent);
+  color: white;
+}
+.alert-success {
+  background-color: var(--color-success);
+  color: white;
+}
+
+/* ===============================
+ 📈 5. 차트/그래프 배경
+=============================== */
+.chart-container {
+  background-color: white;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+/* ===============================
+ 🧱 6. 레이아웃 (그리드 등)
+=============================== */
+.grid-2x2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.grid-full {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--color-primary);
+}
+
+/* ===============================
+ 🖱 7. 버튼 스타일
+=============================== */
+.btn {
+  background-color: var(--color-primary);
+  color: white;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.btn:hover {
+  background-color: #002f5e;
+}
+.btn-danger {
+  background-color: var(--color-danger);
+  color: white;
+}
+.btn-outline {
+  background-color: transparent;
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
+}
+.btn-outline:hover {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+/* ===============================
+ 💡 8. 유틸리티 클래스
+=============================== */
+.text-center {
+  text-align: center;
+}
+.hidden {
+  display: none;
+}
+.text-danger {
+  color: var(--color-danger) !important;
+}
+.border-danger {
+  border: 2px solid var(--color-accent) !important;
+}
+.border-warning {
+  border: 2px dashed #FFA000 !important;
+}
+.border-success {
+  border: 2px solid var(--color-success) !important;
+}

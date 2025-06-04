@@ -28,6 +28,15 @@ except UnicodeDecodeError:
     streaming_df = pd.read_csv(app_dir / "./data/streaming_df.csv",  encoding="cp949")
 
 
+# ✅ 이상치 판단 기준 로드 (범위 기반)
+try:
+    spec_df_all = pd.read_csv(app_dir / "./data/iqr_bounds_by_mold_code.csv", encoding="utf-8")
+except UnicodeDecodeError:
+    spec_df_all = pd.read_csv(app_dir / "./data/iqr_bounds_by_mold_code.csv", encoding="cp949")
+
+# ✅ 컬럼 정리
+spec_df_all.columns = ["mold_code", "variable", "lower", "upper"]
+
 
 # ✅ 센서 데이터의 사람이 읽기 쉬운 한글 이름과 단위 정의
 # UI 카드나 그래프 라벨링 시 활용
@@ -40,6 +49,7 @@ sensor_labels = {
 }
 # 사용할 센서 컬럼 선택
 selected_cols = [
+    'mold_code',
     'registration_time',
     'molten_temp',           # 용탕 온도
     'cast_pressure',         # 주조 압력
