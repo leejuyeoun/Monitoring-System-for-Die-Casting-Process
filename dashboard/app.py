@@ -84,7 +84,8 @@ def server(input, output, session):
         try:
             if not is_streaming.get():
                 return
-            reactive.invalidate_later(2)
+            reactive.invalidate_later(1
+                                      )
             s = streamer.get()
             next_batch = s.get_next_batch(1)
             if next_batch is not None:
@@ -156,13 +157,11 @@ def server(input, output, session):
                         linewidth=2,
                         marker='o', markersize=5)
 
-                ax.set_ylabel(col, fontsize=11)
-                ax.legend(loc='upper right', fontsize=10)
-                ax.grid(True, linestyle='--', alpha=0.5)
-                ax.tick_params(axis='both', labelsize=9)
-
-            axs[-1].set_xlabel("시간", fontsize=11)
-            axs[-1].xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
+                
+                #ax.set_ylabel(col, fontsize=11)
+            # X축 라벨 및 시간 포맷 설정
+            axs[-1].set_xlabel("월-일 시:분", fontsize=11)
+            axs[-1].xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M'))  # ← 요거 수정
             fig.autofmt_xdate()
 
             # fig.suptitle("실시간 센서 스트리밍", fontsize=16, fontweight='bold')
@@ -374,7 +373,7 @@ def server(input, output, session):
     @render.ui
     def anomaly_alerts():
         try:
-            df = accumulator.get().get_data()
+            df = current_data.get()
             if df.empty:
                 return ui.div("데이터 없음", class_="text-muted")
 
@@ -386,36 +385,77 @@ def server(input, output, session):
             anomaly_score = latest.get('anomaly_score', 0) if latest is not None else 0
             anomaly_icon = "❌" if anomaly_status == "이상" else "✅"
             anomaly_class = "anomaly-card alert alert-danger" if anomaly_status == "이상" else "normal-card alert alert-success"
-            
-            # 불량 예측 카드
-            defect_status = "불량" if hasattr(latest, 'predicted_label') and latest.get('predicted_label', 0) == 1 else "양품"
-            defect_prob = latest.get('predict_proba', 0) if latest is not None else 0
-            defect_icon = "❌" if defect_status == "불량" else "✅"
-            defect_class = "anomaly-card alert alert-danger" if defect_status == "불량" else "normal-card alert alert-success"
-            
+            reg_time = latest.get('registration_time')
             return ui.div(
                 # 이상 탐지 카드
                 ui.div(
                     ui.h6(f"{anomaly_icon} 이상 탐지"),
                     ui.p(f"상태: {anomaly_status}"),
                     ui.p(f"점수: {anomaly_score:.3f}"),
-                    ui.p(f"시각: {datetime.now().strftime('%H:%M:%S')}"),
-                    ui.input_action_button("goto_anomaly", "이상탐지 확인하기", class_="btn btn-sm btn-outline-primary"),
+                    ui.p(f"시각: {reg_time}"),
+                    ui.input_action_button("goto_2page", "이상탐지 확인하기", class_="btn btn-sm btn-outline-primary"),
                     class_=anomaly_class
-                ),
-                # 불량 예측 카드
-                ui.div(
-                    ui.h6(f"{defect_icon} 불량 예측"),
-                    ui.p(f"상태: {defect_status}"),
-                    ui.p(f"확률: {defect_prob:.3f}"),
-                    ui.p(f"시각: {datetime.now().strftime('%H:%M:%S')}"),
-                    ui.input_action_button("goto_quality", "불량탐지 확인하기", class_="btn btn-sm btn-outline-primary"),
-                    class_=defect_class
                 )
             )
             
         except Exception as e:
             return ui.div(f"오류: {str(e)}", class_="text-danger")
+        
+        
+    @output
+    @render.ui
+    def current_prediction2():
+        try:
+            df = current_data.get()
+            if df.empty:
+                return ui.div("데이터 없음", class_="text-muted")
+
+            # 최신 데이터 한 행
+            latest = df.iloc[-1]
+
+            if 'passorfail' not in latest:
+                print("⚠️ 'passorfail' 컬럼이 존재하지 않음")
+                return ui.div("예측값 없음", class_="text-muted")
+
+            # 결합 확률은 이미 'passorfail' 컬럼에 예측값이 0~1로 들어온다고 가정
+            prob = latest['passorfail']
+            result = "불량" if prob >= 0.5 else "양품"
+            icon = "❌" if result == "불량" else "✅"
+            color_class = "alert alert-danger" if result == "불량" else "alert alert-success"
+
+            reg_time = latest.get('registration_time')
+            try:
+                reg_time = pd.to_datetime(reg_time).strftime("%Y-%m-%d %H:%M:%S")
+            except Exception as time_err:
+                print(f"⚠️ 시간 파싱 오류: {time_err}")
+                reg_time = "시간 정보 없음"
+
+            return ui.div(
+                ui.div(
+                    ui.h6("🧾 판정 결과"),
+                    ui.h4(f"{icon} {result}", class_="fw-bold"),
+                    class_="mb-2"
+                ),
+                ui.div(
+                    ui.h6("🕒 판정 시간"),
+                    ui.p(reg_time),
+                    ui.input_action_button("goto_3page", "불량탐지 확인하기", class_="btn btn-sm btn-outline-primary")
+                ),
+                class_=f"{color_class} p-3 rounded"
+            )
+
+        except Exception as e:
+            print(f"⛔ current_prediction 오류 발생: {e}")
+            return ui.div(f"오류: {str(e)}", class_="text-danger")
+    @reactive.effect
+    @reactive.event(input.goto_2page)
+    def go_to_page_3():
+        ui.update_navs("main_nav", "공정 이상 탐지	(Process Anomaly Detection)") 
+    
+    @reactive.effect
+    @reactive.event(input.goto_3page)
+    def go_to_page_3():
+        ui.update_navs("main_nav", "품질 이상 판별	(Quality Defect Classification)") 
 
     # ================================
     # TAB 2: [A] 이상 예측
@@ -690,34 +730,46 @@ def server(input, output, session):
             df_vis = df_vis.loc[:, ~df_vis.columns.duplicated()]  # 중복 열 제거
             df_vis['datetime'] = pd.to_datetime(df_vis['registration_time'], errors="coerce")
 
-            # 필터링된 범위 적용
+            # 날짜 필터링
             mask = (df_vis['datetime'].dt.date >= pd.to_datetime(start_date).date()) & \
-                   (df_vis['datetime'].dt.date <= pd.to_datetime(end_date).date())
+                (df_vis['datetime'].dt.date <= pd.to_datetime(end_date).date())
             df_filtered = df_vis.loc[mask]
 
             if df_filtered.empty:
                 raise ValueError("선택한 기간 내 데이터가 없습니다.")
 
-            counts = df_filtered['passorfail'].value_counts().to_dict()
+            # ✅ 몰드코드 + 불량 여부별 카운트
+            grouped = df_filtered.groupby(['mold_code', 'passorfail']).size().unstack(fill_value=0)
+            grouped.columns = ['양품', '불량'] if 0 in grouped.columns else ['불량']
+            grouped = grouped.reset_index()
 
-            labels = ['양품', '불량']
-            sizes = [counts.get(0, 0), counts.get(1, 0)]
-            colors = ['#4CAF50', '#F44336']
+            # ✅ 시각화 (stacked bar chart)
+            import numpy as np
+            mold_codes = grouped['mold_code']
+            x = np.arange(len(mold_codes))
+            width = 0.6
 
-            fig, ax = plt.subplots()
-            wedges, _, _ = ax.pie(
-                sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90
-            )
-            ax.axis('equal')
-            ax.set_title(f"{start_date} ~ {end_date} 불량률")
-            ax.legend(wedges, labels, title="예측 결과", loc="upper right", bbox_to_anchor=(1.1, 1))
+            fig, ax = plt.subplots(figsize=(10, 5))
+            ax.bar(x, grouped.get('양품', [0]*len(grouped)), width, label='양품', color='#4CAF50')
+            ax.bar(x, grouped.get('불량', [0]*len(grouped)), width,
+                bottom=grouped.get('양품', [0]*len(grouped)), label='불량', color='#F44336')
 
+            ax.set_xlabel('몰드 코드')
+            ax.set_ylabel('개수')
+            ax.set_title(f"{start_date} ~ {end_date} 몰드코드별 누적 예측 결과")
+            ax.set_xticks(x)
+            ax.set_xticklabels(mold_codes, rotation=45, ha='right')
+            ax.legend()
+
+            fig.tight_layout()
             return fig
 
         except Exception as e:
+            print(f"[defect_rate_plot] 에러: {e}")
             fig, ax = plt.subplots()
-            ax.text(0.5, 0.5, f"에러: {str(e)}", ha='center', va='center')
+            ax.text(0.5, 0.5, f"에러 발생: {str(e)}", ha='center', va='center')
             return fig
+
 
     # ================================
     # TAP 3 [B] - 이상 불량 알림
@@ -962,7 +1014,8 @@ def server(input, output, session):
                                     # [D] 이상 불량 알림 탭
                                     ui.card(
                                         ui.card_header("[D] 이상 불량 알림"),
-                                        ui.output_ui("anomaly_alerts")
+                                        ui.output_ui("anomaly_alerts"),
+                                        ui.output_ui("current_prediction2"),
                                     ),
                                     col_widths=[6, 6]
                                 )    
@@ -1057,6 +1110,7 @@ def server(input, output, session):
                                     ui.input_action_button("logout_button", "로그아웃", class_="btn btn-danger")
                                 )
                             ),
+                                id="main_nav",
                                 title = "LS 기가 펙토리"
                             )
                         )
