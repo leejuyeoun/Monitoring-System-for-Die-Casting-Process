@@ -43,8 +43,7 @@ spec_df_all.columns = ["mold_code", "variable", "lower", "upper"]
 sensor_labels = {
     "molten_temp": ("용탕온도", "°C"),
     "cast_pressure": ("주조압력", "bar"),
-    "high_section_speed": ("고속구간속도", "mm/s"),
-    "low_section_speed": ("저속구간속도", "mm/s"),
+    "high_section_speed": ("고속구간속도", "mm/s")
     # 필요 시 더 추가
 }
 # 사용할 센서 컬럼 선택
