@@ -21,6 +21,14 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import os
 
+import shap
+
+# 📍 server 구성 위쪽 (전역)
+selected_log_index = reactive.Value(None)
+
+model_pipe = joblib.load("./dashboard/model_pipe.pkl")
+shap_explainer = shap.TreeExplainer(model_pipe.named_steps["classifier"])
+
 from pathlib import Path
 import matplotlib.font_manager as fm
 
@@ -66,6 +74,7 @@ def server(input, output, session):
     current_data = reactive.Value(pd.DataFrame())
     is_streaming = reactive.Value(False)
 
+    selected_log_time = reactive.Value(None)
 
     prediction_table_logs = reactive.Value([])  # TAB 3. [B] 로그 테이블용
     anomaly_detail_logs = reactive.Value([])
@@ -538,10 +547,15 @@ def server(input, output, session):
                 yield buffer.getvalue()
         return writer()
     # ================================
-    # TAP 1 [D] - 이상 불량 알림 
+    # TAP 2 [D] - 이상 불량 알림 
     # ================================
     
-
+    @reactive.Effect
+    def update_selected_log_index():
+        logs = list(reversed(prediction_table_logs.get()))
+        for i in range(len(logs)):
+            if input[f"log_{i}"]() > 0:  # 클릭된 버튼이 눌림
+                selected_log_index.set(i)
 
     # ================================
     # TAB 2: [A] 이상 예측
@@ -645,7 +659,7 @@ def server(input, output, session):
         )
         return ui.div(count_badge, class_="log-container")
     # ================================
-    # TAB 2 [A] 단위 시간 당 불량 관리도
+    # TAB 2 [C] 단위 시간 당 불량 관리도
     # ================================
     @output
     @render.plot
@@ -1002,22 +1016,41 @@ def server(input, output, session):
 
         headers = ["판정 시간", "결과"]
         table_rows = [ui.tags.tr(*[ui.tags.th(h) for h in headers])]
-
-        for log in reversed(logs):  # 최신이 위에
-            table_rows.append(
-                ui.tags.tr(
-                    ui.tags.td(log["판정 시간"]),
-                    ui.tags.td(log["결과"]),
+        for i, log in enumerate(reversed(logs)):
+            result = log["결과"]
+            is_defect = result == "불량"
+            row = ui.tags.tr(
+                ui.tags.td(log["판정 시간"]),
+                ui.tags.td(
+                    ui.input_action_button(f"log_{i}", result, 
+                        class_="btn btn-danger btn-sm" if is_defect else "btn btn-secondary btn-sm")
                 )
             )
+            table_rows.append(row)
 
         return ui.div(
-        ui.tags.table(
-            {"class": "table table-sm table-bordered table-striped mb-0"},
-            *table_rows
-        ),
-        style="max-height: 200px; overflow-y: auto;"  # 스크롤 설정
-    )
+            ui.tags.table(
+                {"class": "table table-sm table-bordered table-striped mb-0"},
+                *table_rows
+            ),
+            style="max-height: 250px; overflow-y: auto;"
+        )
+    
+    #     for log in reversed(logs):  # 최신이 위에
+    #         table_rows.append(
+    #             ui.tags.tr(
+    #                 ui.tags.td(log["판정 시간"]),
+    #                 ui.tags.td(log["결과"]),
+    #             )
+    #         )
+
+    #     return ui.div(
+    #     ui.tags.table(
+    #         {"class": "table table-sm table-bordered table-striped mb-0"},
+    #         *table_rows
+    #     ),
+    #     style="max-height: 200px; overflow-y: auto;"  # 스크롤 설정
+    # )
 # ================================
     # TAP 3 [A] 단위 시간 당 불량 관리도
 # ================================ 
@@ -1090,10 +1123,97 @@ def server(input, output, session):
             ax.text(0.5, 0.5, f"에러 발생: {str(e)}", ha='center', va='center')
             return fig
 
-
 # ================================
 # TAP 3 [D]
 # ================================
+    
+    @reactive.Effect
+    def handle_log_click():
+        for i, log in enumerate(reversed(prediction_table_logs.get())):
+            if input[f"log_{i}"]() > 0:
+                # 시간값을 기준으로 고유하게 선택하도록 설정
+                selected_log_time.set(log["판정 시간"])
+
+    @output
+    @render.plot
+    def shap_explanation_plot():
+        try:
+            reg_time = selected_log_time.get()
+            print("📌 선택된 판정 시간:", reg_time)
+
+            if reg_time is None:
+                fig, ax = plt.subplots()
+                ax.text(0.5, 0.5, "불량 로그를 선택하세요", ha='center')
+                return fig
+
+            # 판정 시간 일치하는 row 찾기
+            df = current_data.get()
+            df['registration_time'] = df['registration_time'].astype(str)
+            row_match = df[df['registration_time'] == str(reg_time)]
+            print("📌 일치하는 판정 시간 개수:", len(row_match))
+
+            if row_match.empty:
+                fig, ax = plt.subplots()
+                ax.text(0.5, 0.5, "해당 시간의 입력값을 찾을 수 없습니다", ha='center')
+                return fig
+
+            # 로그에서 결과 확인
+            logs = list(reversed(prediction_table_logs.get()))
+            log = next((l for l in logs if l["판정 시간"] == reg_time), None)
+            if log is None:
+                fig, ax = plt.subplots()
+                ax.text(0.5, 0.5, "해당 로그를 찾을 수 없습니다", ha='center')
+                return fig
+
+            if log["결과"] != "불량":
+                fig, ax = plt.subplots()
+                ax.axis("off")
+                ax.text(0.5, 0.5, "✅ 양품입니다\nSHAP 해석은 불량에만 제공됩니다", ha='center', va='center', color='gray')
+                return fig
+
+            # ============================
+            # SHAP 계산 로직은 동일
+            # ============================
+            input_row = row_match.iloc[0].drop(['passorfail', 'registration_time'], errors='ignore')
+
+            required_features = model_pipe.feature_names_in_.tolist()
+            ct = model_pipe.named_steps["preprocess"]
+            cat_cols = ct.transformers_[1][2]
+
+            for col in required_features:
+                if col not in input_row:
+                    input_row[col] = "0" if col in cat_cols else 0
+            input_row = input_row[required_features]
+
+            input_df = pd.DataFrame([input_row])
+            for col in cat_cols:
+                if col in input_df.columns:
+                    input_df[col] = input_df[col].astype(str)
+
+            X_transformed = model_pipe.named_steps["preprocess"].transform(input_df)
+            shap_raw = shap_explainer.shap_values(X_transformed)
+
+            if isinstance(shap_raw, list) and len(shap_raw) > 1:
+                shap_val = shap_raw[1][0]
+            else:
+                shap_val = shap_raw[0] if isinstance(shap_raw, list) else shap_raw[0]
+
+            feature_names = model_pipe.named_steps["preprocess"].get_feature_names_out()
+            shap_series = pd.Series(shap_val, index=feature_names).abs().sort_values(ascending=False).head(5)
+
+            fig, ax = plt.subplots()
+            shap_series.plot(kind='barh', ax=ax)
+            ax.invert_yaxis()
+            ax.set_title("SHAP 기여도 상위 변수")
+            ax.set_xlabel("기여도 크기 (절댓값 기준)")
+            return fig
+
+        except Exception as e:
+            print("❌ SHAP plot error:", str(e))
+            fig, ax = plt.subplots()
+            ax.text(0.5, 0.5, f"오류 발생: {str(e)}", ha='center', color='red')
+            return fig
+
 
 
 # ================================
@@ -1284,9 +1404,10 @@ def server(input, output, session):
                                             ),
                                             ui.output_plot("defect_rate_plot", height="300px")
                                         ),
-                                        ui.card(
-                                            # TAB 3 [D]
-                                            ui.card_header("[D]"),
+# TAB 3 [D]
+                                        ui.card(# TAB 3 [D]# TAB 3 [D]# TAB 3 [D]# TAB 3 [D]
+                                            ui.card_header("[D] SHAP 변수 기여도 분석"),
+                                            ui.output_plot("shap_explanation_plot")
                                             
                                         )
                                     )

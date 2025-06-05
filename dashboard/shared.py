@@ -60,7 +60,24 @@ selected_cols = [
     'anomaly_level',
     'top1',
     'top2',
-    'top3'
+    'top3',
+    'physical_strength',
+    'heating_furnace',
+    'tryshot_signal',
+    'lower_mold_temp2',
+    'facility_operation_cycleTime',
+    'upper_mold_temp2',
+    'production_cycletime',
+    'anomaly_score',
+    'count',
+    'Coolant_temperature',
+    'sleeve_temperature',
+    'molten_volume',
+    'upper_mold_temp1',
+    'EMS_operation_time',
+    'lower_mold_temp1', 
+    'working'
+
 ]
 df_selected = streaming_df[selected_cols].reset_index(drop=True)
 
