@@ -57,7 +57,10 @@ selected_cols = [
     'biscuit_thickness',      # 비스킷 두께
     'passorfail',
     'is_anomaly',
-    'anomaly_level'
+    'anomaly_level',
+    'top1',
+    'top2',
+    'top3'
 ]
 df_selected = streaming_df[selected_cols].reset_index(drop=True)
 
@@ -119,3 +122,46 @@ class StreamAccumulator:
         # static_df와 streaming_df 간의 공통 컬럼을 리스트로 반환
         return sorted(set(static_df.columns).intersection(set(streaming_df.columns)))
 
+import requests
+
+def get_weather(lat=32.7767, lon=-96.7970):
+    try:
+        url = "https://api.open-meteo.com/v1/forecast"
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "current_weather": True,
+            "timezone": "America/Chicago"
+        }
+        response = requests.get(url, params=params, timeout=5)
+
+        if response.status_code != 200:
+            return f"🔌 오류 코드 [{response.status_code}] · 날씨 정보를 불러올 수 없습니다."
+
+        data = response.json()
+        weather = data["current_weather"]
+        temp = round(weather["temperature"])
+        windspeed = weather["windspeed"]
+        time = weather["time"]
+
+        # Open-Meteo는 날씨 설명 대신 weathercode 사용
+        # → 아래는 간단한 날씨 코드 → 설명 및 이모지 매핑
+        code_map = {
+            0: ("☀️", "맑음"),
+            1: ("🌤️", "부분 맑음"),
+            2: ("⛅", "구름 많음"),
+            3: ("☁️", "흐림"),
+            45: ("🌫️", "박무"),
+            48: ("🌫️", "박무"),
+            51: ("🌦️", "가벼운 이슬비"),
+            61: ("🌧️", "비"),
+            71: ("❄️", "눈"),
+            95: ("⛈️", "뇌우"),
+        }
+        code = weather["weathercode"]
+        emoji, desc = code_map.get(code, ("🌡️", "정보 없음"))
+
+        return f"텍사스 댈러스 | {emoji} {desc} | 외부온도 : {temp}℃  |  풍속 {windspeed}km/h"
+
+    except Exception as e:
+        return f"❌ 예외 발생: {str(e)}"
